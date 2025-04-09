@@ -28,8 +28,8 @@
 
 #### Steps  
 ```sh
-git clone https://github.com/MoB-369/snapdrop.git
-cd snapdrop
+git clone https://github.com/Zoro-369/FileShare.git
+cd FileShare
 make
 ```
 
