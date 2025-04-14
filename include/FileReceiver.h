@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <unistd.h> // For close()
 #include<vector>
+#include<sys/stat.h>
 
 class FileReceiver {
 public:

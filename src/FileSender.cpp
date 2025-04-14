@@ -4,6 +4,7 @@
 #define PORT "8080"
 #define BUFFER_SIZE 1024
 
+
 FileSender::FileSender(const std::string& serverHost, const std::string& fileName) 
     : serverHost(serverHost), fileName(fileName), clientSocket(-1) {}
 
@@ -43,6 +44,7 @@ void FileSender::sendFileName() {
 }
 
 void FileSender::sendFile() {
+
     if (!connectToServer()) {
         std::cerr << "Connection failed.\n";
         return;
@@ -50,6 +52,7 @@ void FileSender::sendFile() {
     uint8_t type = 0x01;
     send(clientSocket, &type, 1, 0);
     sendFileName();
+
     std::ifstream inFile(fileName, std::ios::binary | std::ios::ate);
     if (!inFile) {
         std::cerr << "Error opening file.\n";
@@ -66,8 +69,17 @@ void FileSender::sendFile() {
         return;
     }
     
+    // Receive resume offset from receiver
+    uint32_t offset = 0;
+    recv(clientSocket,&offset,sizeof(offset),0);
+    offset = be32toh(offset);
+
+    // seek to the offset
+    inFile.seekg(offset,std::ios::beg);
+
+    // Sending the file content from offset
     char buffer[BUFFER_SIZE];
-    size_t sentBytes = 0;
+    size_t sentBytes = offset;
     uint32_t totalSizeHost = ntohl(totalSize);  // Convert back for display
 
     while (sentBytes < totalSizeHost) {
@@ -77,13 +89,16 @@ void FileSender::sendFile() {
         
         if (send(clientSocket, buffer, bytesRead, 0) <= 0) {
             std::cerr << "Error sending file data.\n";
-            return;
+            break;
         }
         sentBytes += bytesRead;
-        printProgressBar(sentBytes, totalSize, 20);
+        printProgressBar(sentBytes, totalSizeHost, 20);
     }
-
-    std::cout << "\r[####################] 100% \nFile sent successfully.\n";
+    if(sentBytes == totalSizeHost){
+        std::lock_guard<std::mutex> lock(coutMutex);
+        std::cout << "\r[####################] 100% \nFile sent successfully.\n";
+    }
+    
     inFile.close();
 }
 

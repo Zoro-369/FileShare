@@ -14,6 +14,7 @@
 - 🔧 **Lightweight & Fast** - Built using C++ with minimal dependencies.  
 - 💬 **Send Messages** - Send message directly between peers.
 - **Multiple file transfer** - Send multiple files together. Also allows sending folder in zip form.
+- **Retry from last part** - If connection gets interrupted, then resumes sending file from the last sent part.
 ---
 
 ## 🛠️ Installation  
@@ -28,8 +29,8 @@
 
 #### Steps  
 ```sh
-git clone https://github.com/Zoro-369/FileShare.git
-cd FileShare
+git clone https://github.com/MoB-369/snapdrop.git
+cd snapdrop
 make
 ```
 

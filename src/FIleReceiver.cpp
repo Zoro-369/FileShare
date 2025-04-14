@@ -97,28 +97,50 @@ void FileReceiver::receiveFile(int clientSocket,std::string filename) {
     fileSize = ntohl(fileSize);
 
     char buffer[BUFFER_SIZE];
-    size_t receivedBytes = 0;
-    // size_t totalReceived = 0;
-    // if(!std::filesystem::exists("received_file")){
-    //     std::filesystem::create_directory("received_file");
-    // }
-    std::ofstream outFile("received_files/" + fileName, std::ios::binary);
-    if (!outFile) {
+    
+    
+    std::string outputPath = "received_files/" + fileName;
+    
+    std::ofstream file;
+    uint32_t offset = 0;
+    // If file exists, get current size and open in append mode
+    struct stat st;
+    if(stat(outputPath.c_str(),&st) == 0){
+        offset = st.st_size;
+        file.open(outputPath,std::ios::binary | std::ios::app);
+    }
+    else{
+        file.open(outputPath,std::ios::binary);
+    }
+    if (!file) {
         std::lock_guard<std::mutex> lock(coutMutex);
         std::cerr << "Error opening file for writing.\n";
         return;
     }
+    // Send offset to sender
+    uint32_t offsetNet = htobe32(offset);
+    send(clientSocket,&offsetNet,sizeof(offsetNet),0);
 
+    // Start Receiving from offset
     {
         std::lock_guard<std::mutex> lock(coutMutex);
         std::cout << "Receiving file: " << fileName << " (" << fileSize << " bytes)\n";
     }
 
-    int bytesReceived;
-
-    while (receivedBytes<fileSize && (bytesReceived = recv(clientSocket, buffer, BUFFER_SIZE, 0)) > 0) {
-          
-        outFile.write(buffer, bytesReceived);
+    ssize_t bytesReceived;
+    uint32_t receivedBytes = offset;
+    {
+        std::lock_guard<std::mutex> lock(coutMutex);
+        std::cout<<"Starting receiving file from "<<receivedBytes<<" Bytes"<<std::endl;
+    }
+    while (receivedBytes<fileSize) {
+        bytesReceived = recv(clientSocket, buffer, BUFFER_SIZE, 0);
+        if(bytesReceived <= 0){
+            std::lock_guard<std::mutex> lock(coutMutex);
+            std::cerr<<"Connection lost at "<<receivedBytes<<"/"<<fileSize<<std::endl;
+            break;
+        }
+        file.write(buffer, bytesReceived);
         // outFile.flush();
 
         receivedBytes += bytesReceived;
@@ -129,17 +151,19 @@ void FileReceiver::receiveFile(int clientSocket,std::string filename) {
     {
         std::lock_guard<std::mutex> lock(coutMutex);
         if (receivedBytes != fileSize) {
+            std::cout<<std::endl;
             std::cerr << "Warning: Expected " << fileSize << " bytes but received " << receivedBytes<< " bytes!\n";
         }
     }
     
 
-    {
+      
+    if(receivedBytes == fileSize){
         std::lock_guard<std::mutex> lock(coutMutex);
         std::cout << "\r[####################] 100% \nFile received successfully.\n";
     }
-
-    outFile.close();
+        
+    file.close();
 }
 
 void FileReceiver::receiveData(int clientSocket) {
